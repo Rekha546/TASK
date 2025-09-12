@@ -1,81 +1,132 @@
-#accounts views.py
-from django.http import JsonResponse
 from django.shortcuts import render, redirect
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
+from accounts.models import Topic, TopicRequest
+from django.contrib.auth.models import User
+from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
-import logging
-from ldap3 import Server, Connection
-from .models import LogEntry, LoginEntry
-from .ldap_config import LDAP_SERVER_URL, GROUP_BASE, USER_BASE, BIND_DN, BIND_PASSWORD
+import json
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-handler = logging.StreamHandler()
-logger.addHandler(handler)
-
-def execute_confluent_command(command):
-    server = Server(LDAP_SERVER_URL, get_info=ALL)
-    conn = Connection(server, user=BIND_DN, password=BIND_PASSWORD, auto_bind=True)
-    approved = command.lower() == "test"
-    if approved:
-        conn.search(USER_BASE, "(objectClass=inetOrgPerson)", attributes=['uid'])
-        result = f"Command '{command}' executed via LDAP at {timezone.now().strftime('%Y-%m-%d %H:%M:%S %Z')}"
-    else:
-        result = f"Command '{command}' rejected at {timezone.now().strftime('%Y-%m-%d %H:%M:%S %Z')}"
-    conn.unbind()
-    return approved, result
+def redirect_home(request):
+    if request.user.is_authenticated:
+        if request.user.is_superuser:
+            return redirect('superuser_home')
+        return redirect('user_home')
+    return redirect('login')
 
 def login_view(request):
-    if request.method == "POST":
-        username = request.POST.get("username")
-        password = request.POST.get("password")
-        logger.info(f"Attempting to authenticate user: {username} at {timezone.now().strftime('%Y-%m-%d %H:%M:%S %Z')}")
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
         user = authenticate(request, username=username, password=password)
-        ip_address = request.META.get('REMOTE_ADDR')
         if user is not None:
             login(request, user)
-            logger.info(f"User {username} logged in successfully at {timezone.now().strftime('%Y-%m-%d %H:%M:%S %Z')}")
-            LoginEntry.objects.create(user=user, success=True, ip_address=ip_address)
-            return JsonResponse({"success": True, "message": "Login successful"})
+            if user.is_superuser:
+                return redirect('superuser_home')
+            return redirect('user_home')
         else:
-            logger.warning(f"Authentication failed for {username} at {timezone.now().strftime('%Y-%m-%d %H:%M:%S %Z')}")
-            LoginEntry.objects.create(user=None, success=False, ip_address=ip_address, message=f"Invalid credentials for {username}")
-            return JsonResponse({"success": False, "message": "Invalid credentials"})
-    return render(request, "login.html")
+            return render(request, 'login.html', {'error': 'Invalid credentials'})
+    return render(request, 'login.html', {})
 
-def submit_request(request):
-    if not request.user.is_authenticated:
-        return redirect("login")
-    if request.method == "POST":
-        command = request.POST.get("command", "")
-        approved, message = execute_confluent_command(command)
-        LogEntry.objects.create(command=command, approved=approved, message=message)
-        logger.info(f"Command: {command}, Approved: {approved}, Message: {message}, Time: {timezone.now().strftime('%Y-%m-%d %H:%M:%S %Z')}")
-        return JsonResponse({"approved": approved, "message": message})
-    return render(request, "submit.html")
+@login_required
+def logout_view(request):
+    logout(request)
+    return redirect('login')
 
-def home(request):
-    if not request.user.is_authenticated:
-        return redirect("login")
-    topics = ["1", "2", "3", "4"]
-    return render(request, "home.html", {"topics": topics})
+@login_required
+def user_home(request):
+    if request.user.is_superuser:
+        return redirect('superuser_home')
+    if request.method == 'POST':
+        topic_name = request.POST.get('topic_name')
+        partitions = request.POST.get('partitions', 1)
+        TopicRequest.objects.create(
+            topic_name=topic_name,
+            partitions=partitions,
+            requested_by=request.user
+        )
+        return redirect('user_home')
+    requests = TopicRequest.objects.filter(requested_by=request.user)
+    return render(request, 'user_home.html', {'requests': requests})
 
-def topic_detail(request, topic_name):
-    if not request.user.is_authenticated:
-        return redirect("login")
-    logger.info(f"Rendering topic_detail with topic_name: {topic_name}")
-    topics = ["1", "2", "3", "4"]  # Match the home view topics
-    return render(request, "topic_detail.html", {"topic_name": topic_name, "topics": topics})
+@login_required
+def superuser_home(request):
+    if not request.user.is_superuser:
+        return HttpResponse('Unauthorized', status=403)
+    requests = TopicRequest.objects.all()
+    return render(request, 'superuser_home.html', {'requests': requests})
 
+@login_required
+@csrf_exempt
 def create_topic(request):
-    if not request.user.is_authenticated:
-        return redirect("login")
-    if request.method == "POST":
-        topic_name = request.POST.get("topic_name").strip()
-        partitions = request.POST.get("partitions")
-        if topic_name and partitions:
-            logger.info(f"Creating topic '{topic_name}' with {partitions} partitions")
-            return redirect("topic_detail", topic_name=topic_name)
-        else:
-            return render(request, "home.html", {"topics": ["1", "2", "3", "4"], "error": "Please fill all fields."})
-    return render(request, "home.html", {"topics": ["1", "2", "3", "4"]})
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            topic_name = data.get('topic_name')
+            partitions = data.get('partitions', 1)
+            Topic.objects.create(
+                name=topic_name,
+                creator=request.user,
+                partitions=partitions
+            )
+            return HttpResponse('Topic created', status=200)
+        except Exception as e:
+            return HttpResponse(str(e), status=400)
+    return HttpResponse('Method not allowed', status=405)
+
+@login_required
+def handle_request(request, request_id):
+    if not request.user.is_superuser:
+        return HttpResponse('Unauthorized', status=403)
+    topic_request = TopicRequest.objects.get(id=request_id)
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        topic_request.status = action
+        topic_request.reviewed_by = request.user
+        topic_request.reviewed_at = timezone.now()
+        topic_request.save()
+        if action == 'Approved':
+            Topic.objects.create(
+                name=topic_request.topic_name,
+                creator=topic_request.requested_by,
+                partitions=topic_request.partitions
+            )
+        return redirect('superuser_home')
+    return render(request, 'handle_request.html', {'request': topic_request})
+
+@login_required
+@csrf_exempt
+def create_partition(request, topic_name):
+    if not request.user.is_superuser:
+        return HttpResponse('Unauthorized', status=403)
+    try:
+        topic = Topic.objects.get(name=topic_name)
+        topic.partitions += 1
+        topic.save()
+        return HttpResponse('Partition added', status=200)
+    except Topic.DoesNotExist:
+        return HttpResponse('Topic not found', status=404)
+
+@login_required
+@csrf_exempt
+def delete_partition(request, topic_name):
+    if not request.user.is_superuser:
+        return HttpResponse('Unauthorized', status=403)
+    try:
+        topic = Topic.objects.get(name=topic_name)
+        if topic.partitions > 1:
+            topic.partitions -= 1
+            topic.save()
+            return HttpResponse('Partition removed', status=200)
+        return HttpResponse('Cannot reduce partitions below 1', status=400)
+    except Topic.DoesNotExist:
+        return HttpResponse('Topic not found', status=404)
+
+@login_required
+def topic_detail(request, topic_name):
+    try:
+        topic = Topic.objects.get(name=topic_name)
+        return render(request, 'topic_detail.html', {'topic': topic})
+    except Topic.DoesNotExist:
+        return HttpResponse('Topic not found', status=404)

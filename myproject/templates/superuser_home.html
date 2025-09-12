@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Superuser Home{% endblock %}
+{% block content %}
+<div class="content">
+    <h2>Manage Topic Requests</h2>
+    <table>
+        <tr>
+            <th>Topic Name</th>
+            <th>Partitions</th>
+            <th>Requested By</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+        {% for request in requests %}
+            <tr>
+                <td>{{ request.topic_name }}</td>
+                <td>{{ request.partitions }}</td>
+                <td>{{ request.requested_by.username }}</td>
+                <td>{{ request.status }}</td>
+                <td>
+                    {% if request.status == "Pending" %}
+                        <form action="{% url 'handle_request' request.id %}" method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="Approved">
+                            <button type="submit" class="btn-approve">Approve</button>
+                        </form>
+                        <form action="{% url 'handle_request' request.id %}" method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="Declined">
+                            <button type="submit" class="btn-decline">Decline</button>
+                        </form>
+                    {% endif %}
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="5">No requests found.</td></tr>
+        {% endfor %}
+    </table>
+    <h3>Create Topic</h3>
+    <form id="createTopicForm" method="post" action="{% url 'create_topic' %}">
+        {% csrf_token %}
+        <input type="text" name="topic_name" placeholder="Topic Name" required>
+        <input type="number" name="partitions" placeholder="Partitions" min="1" value="1">
+        <button type="submit" class="btn-blue">Create Topic</button>
+    </form>
+</div>
+{% endblock %}

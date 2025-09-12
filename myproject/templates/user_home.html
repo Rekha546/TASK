@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}User Home{% endblock %}
+{% block content %}
+<div class="content">
+    <h2>Submit Topic Request</h2>
+    <form method="post">
+        {% csrf_token %}
+        <input type="text" name="topic_name" placeholder="Topic Name" required>
+        <input type="number" name="partitions" placeholder="Partitions" min="1" value="1">
+        <button type="submit" class="btn-blue">Submit Request</button>
+    </form>
+    <h3>Your Requests</h3>
+    <table>
+        <tr>
+            <th>Topic Name</th>
+            <th>Partitions</th>
+            <th>Status</th>
+            <th>Requested At</th>
+        </tr>
+        {% for request in requests %}
+            <tr>
+                <td>{{ request.topic_name }}</td>
+                <td>{{ request.partitions }}</td>
+                <td>{{ request.status }}</td>
+                <td>{{ request.requested_at }}</td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="4">No requests found.</td></tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}

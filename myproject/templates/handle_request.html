@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Handle Request{% endblock %}
+{% block content %}
+<div class="content">
+    <h2>Handle Request: {{ request.topic_name }}</h2>
+    <p>Requested by: {{ request.requested_by.username }}</p>
+    <p>Partitions: {{ request.partitions }}</p>
+    <form method="post" action="{% url 'handle_request' request.id %}">
+        {% csrf_token %}
+        <button type="submit" name="action" value="Approved" class="btn-approve">Approve</button>
+        <button type="submit" name="action" value="Declined" class="btn-decline">Decline</button>
+    </form>
+</div>
+{% endblock %}

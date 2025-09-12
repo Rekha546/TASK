@@ -11,8 +11,12 @@ import logging
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-4z)z9zy!7fe^ef!p4pumaeq07g1q)v!@6ss4alf3e$xbm^l2hu'
+
+
+
 DEBUG = True
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['your-domain.com', 'localhost', '127.0.0.1']
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -53,20 +57,26 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'myproject.wsgi.application'
 
+# LDAP Configuration
 AUTH_LDAP_SERVER_URI = "ldap://127.0.0.1:389"
 AUTH_LDAP_BIND_DN = "cn=admin,dc=confluentdemo,dc=io"
 AUTH_LDAP_BIND_PASSWORD = "admin"
 AUTH_LDAP_USER_SEARCH = LDAPSearch("ou=users,dc=confluentdemo,dc=io", ldap.SCOPE_SUBTREE, "(uid=%(user)s)")
 AUTH_LDAP_GROUP_SEARCH = LDAPSearch("ou=groups,dc=confluentdemo,dc=io", ldap.SCOPE_SUBTREE, "(objectClass=posixGroup)")
 AUTH_LDAP_GROUP_TYPE = GroupOfNamesType()
-AUTHENTICATION_BACKENDS = ("django_auth_ldap.backend.LDAPBackend", "django.contrib.auth.backends.ModelBackend")
-
-# Optional attribute mapping
 AUTH_LDAP_USER_ATTR_MAP = {
     "first_name": "givenName",
     "last_name": "sn",
-    "email": "mail"
+    "email": "mail",
 }
+AUTH_LDAP_USER_FLAGS_BY_GROUP = {
+    "is_superuser": "cn=superusers,ou=groups,dc=confluentdemo,dc=io",  # Map LDAP group to superuser
+    "is_staff": "cn=superusers,ou=groups,dc=confluentdemo,dc=io",      # Allow admin access
+}
+AUTHENTICATION_BACKENDS = (
+    "django_auth_ldap.backend.LDAPBackend",
+    "django.contrib.auth.backends.ModelBackend",  # Fallback for local superusers
+)
 
 DATABASES = {
     'default': {
@@ -88,6 +98,7 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # For collectstatic in production
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

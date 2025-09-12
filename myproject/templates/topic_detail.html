@@ -1,149 +1,21 @@
-<!-- topic_detail.html -->
-<!DOCTYPE html>
-<html>
-<head>
-    <title>{{ topic_name }} Management</title>
-    <style>
-        body {
-            margin: 0;
-            font-family: 'Roboto', Arial, sans-serif;
-            background-color: #f5f6f5;
-        }
-        .header {
-            background-color: #4a90e2;
-            color: white;
-            padding: 15px;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        }
-        .sidebar {
-            width: 250px;
-            height: calc(100vh - 60px);
-            position: fixed;
-            top: 60px;
-            left: 0;
-            background-color: #ffffff;
-            padding-top: 20px;
-            border-right: 1px solid #e0e0e0;
-            overflow-y: auto;
-        }
-        .sidebar h3 {
-            padding: 10px 20px;
-            margin: 0;
-            background-color: #f0f0f0;
-            color: #333;
-            font-size: 16px;
-        }
-        .sidebar a {
-            padding: 12px 20px;
-            display: block;
-            color: #333;
-            text-decoration: none;
-            font-size: 14px;
-        }
-        .sidebar a:hover {
-            background-color: #f0f0f0;
-        }
-        .content {
-            margin-left: 260px;
-            padding: 20px;
-            min-height: calc(100vh - 60px);
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-            position: relative;
-        }
-        .button-group {
-            margin-top: 20px;
-            display: flex;
-            gap: 10px;
-        }
-        .button {
-            padding: 12px 25px;
-            background-color: #4a90e2;
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-            border-radius: 6px;
-            transition: background-color 0.3s;
-        }
-        .button:hover {
-            background-color: #357abd;
-        }
-        .delete-button {
-            background-color: #d9534f;
-        }
-        .delete-button:hover {
-            background-color: #c9302c;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        th {
-            background-color: #f0f0f0;
-            color: #333;
-        }
-        .add-topic-button {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            padding: 12px 25px;
-            background-color: #4a90e2;
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-            border-radius: 6px;
-            transition: background-color 0.3s;
-        }
-        .add-topic-button:hover {
-            background-color: #357abd;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h2>Application Dashboard</h2>
-    </div>
-    <div class="sidebar">
-        <h3>Topics</h3>
-        {% for topic in topics %}
-            <a href="{% url 'topic_detail' topic_name=topic %}">{{ topic }}</a>
-        {% endfor %}
-    </div>
-    <div class="content">
-        <h2>Topics {{ topic_name }}</h2>
-        <a href="{% url 'home' %}" class="add-topic-button">Add Topic</a>
-        <table>
-            <tr>
-                <th>Topic Name</th>
-                <th>Status</th>
-                <th>Partitions</th>
-                <th>Production</th>
-                <th>Consumption</th>
-                <th>Followers</th>
-                <th>Observers</th>
-                <th>Last Produced</th>
-            </tr>
-            <tr>
-                <td>{{ topic_name }}</td>
-                <td>Active</td>
-                <td>3</td>
-                <td>100 msg/s</td>
-                <td>95 msg/s</td>
-                <td>5</td>
-                <td>2</td>
-                <td>2025-09-02 17:00 IST</td>
-            </tr>
-        </table>
-    </div>
-</body>
-</html>
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Topic: {{ topic.name }}{% endblock %}
+{% block content %}
+<div class="content">
+    <h2>Topic: {{ topic.name }}</h2>
+    <p>Creator: {{ topic.creator.username }}</p>
+    <p>Partitions: {{ topic.partitions }}</p>
+    <p>Active: {{ topic.is_active }}</p>
+    {% if user.is_superuser %}
+        <form action="{% url 'create_partition' topic.name %}" method="post" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn-blue">Add Partition</button>
+        </form>
+        <form action="{% url 'delete_partition' topic.name %}" method="post" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn-decline">Remove Partition</button>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}

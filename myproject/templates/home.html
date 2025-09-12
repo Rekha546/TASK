@@ -1,104 +1,126 @@
-<!-- home.html -->
+{% load static %}
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Home Page</title>
-    <style>
-        body {
-            margin: 0;
-            font-family: 'Roboto', Arial, sans-serif;
-            background-color: #f5f6f5;
-        }
-        .header {
-            background-color: #4a90e2;
-            color: white;
-            padding: 15px;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        }
-        .sidebar {
-            width: 250px;
-            height: calc(100vh - 60px);
-            position: fixed;
-            top: 60px;
-            left: 0;
-            background-color: #ffffff;
-            padding-top: 20px;
-            border-right: 1px solid #e0e0e0;
-            overflow-y: auto;
-        }
-        .sidebar h3 {
-            padding: 10px 20px;
-            margin: 0;
-            background-color: #f0f0f0;
-            color: #333;
-            font-size: 16px;
-        }
-        .sidebar a {
-            padding: 12px 20px;
-            display: block;
-            color: #333;
-            text-decoration: none;
-            font-size: 14px;
-        }
-        .sidebar a:hover {
-            background-color: #f0f0f0;
-        }
-        .content {
-            margin-left: 260px;
-            padding: 20px;
-            min-height: calc(100vh - 60px);
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        }
-        .form-group {
-            margin-top: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px; /* Maintains spacing between elements */
-        }
-        .form-input {
-            padding: 12px;
-            font-size: 14px;
-            border: 1px solid #e0e0e0;
-            border-radius: 6px;
-            width: 200px;
-        }
-        .submit-button {
-            padding: 12px 25px;
-            background-color: #4a90e2;
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-            border-radius: 6px;
-            transition: background-color 0.3s;
-            width: 200px; /* Match input width for consistency */
-        }
-        .submit-button:hover {
-            background-color: #357abd;
-        }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
 </head>
 <body>
-    <div class="header">
-        <h2>Application Dashboard</h2>
-    </div>
-    <div class="sidebar">
-        <h3>Topics</h3>
-        {% for topic in topics %}
-            <a href="{% url 'topic_detail' topic_name=topic %}">{{ topic }}</a>
-        {% endfor %}
-    </div>
-    <div class="content">
-        <h2>Welcome to Home Page</h2>
-        <form method="post" action="{% url 'create_topic' %}" class="form-group">
+<header>
+    <h2>Application Dashboard</h2>
+    <div class="user-info">
+        <span class="username">{{ username }}{% if user.is_superuser %} (SuperUser){% endif %}</span>
+        <form method="POST" action="{% url 'logout' %}" class="logout-form">
             {% csrf_token %}
-            <input type="text" name="topic_name" placeholder="Topic Name" class="form-input" required>
-            <input type="number" name="partitions" placeholder="Number of Partitions" class="form-input" min="1" required>
-            <button type="submit" class="submit-button">submit</button>
+            <button type="submit">Logout</button>
         </form>
     </div>
+</header>
+
+<div class="container">
+    <div class="sidebar">
+        <h3>Topics</h3>
+        <ul>
+            {% for topic in topics %}
+                <li><a href="{% url 'topic_detail' topic.name %}">{{ topic.name }}</a></li>
+            {% empty %}
+                <li>No topics available.</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="main-content">
+        {% if error %}<p style="color:red;">{{ error }}</p>{% endif %}
+        {% if success %}<p style="color:green;">{{ success }}</p>{% endif %}
+
+        {% if user.is_superuser %}
+            <h3>All Topic Requests</h3>
+            {% if requests %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Topic Name</th>
+                            <th>Partitions</th>
+                            <th>Requested By</th>
+                            <th>Status</th>
+                            <th>Requested At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for request in requests %}
+                        <tr id="request-{{ request.id }}">
+                            <td>{{ request.topic_name }}</td>
+                            <td>{{ request.partitions }}</td>
+                            <td>{{ request.requested_by.username }}</td>
+                            <td>{{ request.status }}</td>
+                            <td>{{ request.requested_at|date:"Y-m-d H:i T" }}</td>
+                            <td>
+                                {% if request.status == "PENDING" %}
+                                <form method="POST" action="{% url 'handle_request' request.id %}" style="display:inline">
+                                    {% csrf_token %}
+                                    <button name="action" value="approve">Accept</button>
+                                </form>
+                                <form method="POST" action="{% url 'handle_request' request.id %}" style="display:inline">
+                                    {% csrf_token %}
+                                    <button name="action" value="decline">Decline</button>
+                                </form>
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No requests found.</p>
+            {% endif %}
+
+            <h3>Create New Topic</h3>
+            <form method="POST" action="{% url 'create_topic' %}">
+                {% csrf_token %}
+                <input type="text" name="topic_name" placeholder="Topic Name" required>
+                <input type="number" name="partitions" placeholder="Number of Partitions" min="1" required>
+                <button type="submit">Create Topic</button>
+            </form>
+
+        {% else %}
+            <h3>Request Topic Creation</h3>
+            <form method="POST">
+                {% csrf_token %}
+                <input type="text" name="topic_name" placeholder="Topic Name" required>
+                <input type="number" name="partitions" placeholder="Number of Partitions" min="1" required>
+                <button type="submit">Submit Request</button>
+            </form>
+
+            <h3>Your Requests</h3>
+            {% if requests %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Topic Name</th>
+                        <th>Partitions</th>
+                        <th>Status</th>
+                        <th>Requested At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for request in requests %}
+                    <tr>
+                        <td>{{ request.topic_name }}</td>
+                        <td>{{ request.partitions }}</td>
+                        <td>{{ request.status }}</td>
+                        <td>{{ request.requested_at|date:"Y-m-d H:i T" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>You have no requests yet.</p>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
 </body>
 </html>

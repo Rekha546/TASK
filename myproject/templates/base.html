@@ -1,0 +1,36 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Topic Management{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+</head>
+<body>
+    <div class="sidebar">
+        <h3>Topics</h3>
+        {% if user.is_authenticated %}
+            <ul>
+                {% for topic in user.topics_created.all %}
+                    <li><a href="{% url 'topic_detail' topic.name %}">{{ topic.name }}</a></li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </div>
+    <div class="hamburger">
+        {% if user.is_authenticated %}
+            <span>{{ user.username }}</span>
+            <a href="{% url 'logout' %}">Logout</a>
+        {% else %}
+            <a href="{% url 'login' %}">Login</a>
+        {% endif %}
+    </div>
+    <div class="content">
+        {% block content %}
+        {% endblock %}
+    </div>
+    <script src="{% static 'requests.js' %}"></script>
+    <script src="{% static 'topic.js' %}"></script>
+</body>
+</html>
